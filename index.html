@@ -3,8 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF to Text Converter</title>
+    <title>PDF Toolkit - All-in-One PDF Manager</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <style>
         * {
             margin: 0;
@@ -13,30 +15,24 @@
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             min-height: 100vh;
             padding: 20px;
         }
 
         .container {
-            max-width: 900px;
+            max-width: 1400px;
             margin: 0 auto;
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
             border-radius: 20px;
             box-shadow: 0 20px 40px rgba(0, 0, 0, 0.1);
             overflow: hidden;
-            animation: fadeIn 0.8s ease-out;
-        }
-
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(30px); }
-            to { opacity: 1; transform: translateY(0); }
         }
 
         .header {
-            background: linear-gradient(135deg, #ff6b6b, #ee5a24);
+            background: linear-gradient(135deg, #2c3e50, #34495e);
             color: white;
             padding: 30px;
             text-align: center;
@@ -44,435 +40,1227 @@
 
         .header h1 {
             font-size: 2.5rem;
-            font-weight: 700;
             margin-bottom: 10px;
-            text-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+            font-weight: 300;
         }
 
         .header p {
-            font-size: 1.1rem;
             opacity: 0.9;
+            font-size: 1.1rem;
         }
 
-        .content {
+        .tools-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
             padding: 40px;
         }
 
-        .upload-area {
-            border: 3px dashed #ddd;
+        .tool-card {
+            background: white;
             border-radius: 15px;
-            padding: 60px 30px;
-            text-align: center;
-            margin-bottom: 30px;
+            padding: 30px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.08);
             transition: all 0.3s ease;
-            cursor: pointer;
             position: relative;
             overflow: hidden;
         }
 
-        .upload-area:hover {
-            border-color: #667eea;
-            background: rgba(102, 126, 234, 0.05);
-            transform: translateY(-2px);
+        .tool-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 4px;
+            background: linear-gradient(90deg, #667eea, #764ba2);
         }
 
-        .upload-area.dragover {
-            border-color: #667eea;
-            background: rgba(102, 126, 234, 0.1);
-            transform: scale(1.02);
+        .tool-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 15px 35px rgba(0, 0, 0, 0.15);
         }
 
-        .upload-icon {
-            font-size: 4rem;
-            color: #667eea;
+        .tool-header {
+            display: flex;
+            align-items: center;
             margin-bottom: 20px;
-            animation: float 3s ease-in-out infinite;
         }
 
-        @keyframes float {
-            0%, 100% { transform: translateY(0px); }
-            50% { transform: translateY(-10px); }
+        .tool-icon {
+            font-size: 2rem;
+            margin-right: 15px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
         }
 
-        .upload-text {
+        .tool-title {
             font-size: 1.3rem;
-            color: #333;
-            margin-bottom: 10px;
             font-weight: 600;
+            color: #2c3e50;
         }
 
-        .upload-subtext {
-            color: #666;
-            font-size: 1rem;
+        .tool-description {
+            color: #6c757d;
+            margin-bottom: 20px;
+            line-height: 1.6;
         }
 
-        #fileInput {
-            display: none;
+        .file-upload {
+            position: relative;
+            display: inline-block;
+            width: 100%;
+            margin-bottom: 20px;
+        }
+
+        .file-input {
+            position: absolute;
+            opacity: 0;
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        .file-label {
+            display: block;
+            padding: 15px 20px;
+            background: #f8f9fa;
+            border: 2px dashed #dee2e6;
+            border-radius: 10px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 500;
+        }
+
+        .file-label:hover {
+            background: #e9ecef;
+            border-color: #667eea;
+            color: #667eea;
+        }
+
+        .file-label.dragover {
+            background: #e7f3ff;
+            border-color: #007bff;
+            color: #007bff;
         }
 
         .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 0.9rem;
+        }
+
+        .btn-primary {
             background: linear-gradient(135deg, #667eea, #764ba2);
             color: white;
-            border: none;
-            padding: 15px 30px;
-            border-radius: 25px;
-            font-size: 1.1rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
         }
 
-        .btn:hover {
+        .btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.6);
+            box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
         }
 
-        .btn:disabled {
-            opacity: 0.6;
-            cursor: not-allowed;
-            transform: none;
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+        }
+
+        .btn-danger {
+            background: #dc3545;
+            color: white;
+        }
+
+        .btn-success {
+            background: #28a745;
+            color: white;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-label {
+            display: block;
+            margin-bottom: 8px;
+            font-weight: 600;
+            color: #2c3e50;
+        }
+
+        .form-input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-size: 1rem;
+            transition: all 0.3s ease;
+        }
+
+        .form-input:focus {
+            outline: none;
+            border-color: #667eea;
+            box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
         }
 
         .progress {
             width: 100%;
             height: 8px;
-            background: #f0f0f0;
+            background: #e9ecef;
             border-radius: 4px;
-            margin: 20px 0;
             overflow: hidden;
-            display: none;
+            margin: 15px 0;
         }
 
         .progress-bar {
             height: 100%;
             background: linear-gradient(90deg, #667eea, #764ba2);
-            border-radius: 4px;
-            transition: width 0.3s ease;
             width: 0%;
-        }
-
-        .result-area {
-            margin-top: 30px;
-            display: none;
-        }
-
-        .result-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 15px;
-        }
-
-        .result-title {
-            font-size: 1.3rem;
-            font-weight: 600;
-            color: #333;
-        }
-
-        .copy-btn {
-            background: #28a745;
-            padding: 8px 16px;
-            font-size: 0.9rem;
-        }
-
-        .copy-btn:hover {
-            background: #218838;
-        }
-
-        .download-btn {
-            background: #17a2b8;
-            padding: 8px 16px;
-            font-size: 0.9rem;
-            margin-left: 10px;
-        }
-
-        .download-btn:hover {
-            background: #138496;
-        }
-
-        #extractedText {
-            width: 100%;
-            min-height: 300px;
-            padding: 20px;
-            border: 2px solid #e9ecef;
-            border-radius: 10px;
-            font-family: 'Courier New', monospace;
-            font-size: 14px;
-            line-height: 1.5;
-            resize: vertical;
-            background: #f8f9fa;
+            transition: width 0.3s ease;
         }
 
         .status {
-            margin: 20px 0;
-            padding: 15px;
-            border-radius: 10px;
-            display: none;
+            padding: 12px;
+            border-radius: 8px;
+            margin: 15px 0;
+            font-weight: 500;
         }
 
-        .status.success {
+        .status-success {
             background: #d4edda;
             color: #155724;
             border: 1px solid #c3e6cb;
         }
 
-        .status.error {
+        .status-error {
             background: #f8d7da;
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
 
-        .status.info {
+        .status-info {
             background: #d1ecf1;
             color: #0c5460;
             border: 1px solid #bee5eb;
         }
 
-        .file-info {
-            background: #f8f9fa;
-            padding: 15px;
+        .pdf-preview {
+            border: 2px solid #e1e8ed;
             border-radius: 10px;
-            margin-bottom: 20px;
-            display: none;
+            margin: 15px 0;
+            max-height: 400px;
+            overflow-y: auto;
+            background: #f8f9fa;
         }
 
-        .file-info h3 {
-            margin-bottom: 10px;
-            color: #333;
+        .page-thumbnail {
+            width: 100px;
+            height: 140px;
+            border: 2px solid #dee2e6;
+            border-radius: 5px;
+            margin: 5px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: inline-block;
+            position: relative;
         }
 
-        .info-row {
+        .page-thumbnail:hover {
+            border-color: #667eea;
+            transform: scale(1.05);
+        }
+
+        .page-thumbnail.selected {
+            border-color: #28a745;
+            box-shadow: 0 0 10px rgba(40, 167, 69, 0.3);
+        }
+
+        .page-number {
+            position: absolute;
+            bottom: 2px;
+            left: 2px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 0.8rem;
+        }
+
+        .text-output {
+            width: 100%;
+            min-height: 200px;
+            padding: 15px;
+            border: 2px solid #e1e8ed;
+            border-radius: 8px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.4;
+            background: #f8f9fa;
+            resize: vertical;
+        }
+
+        .button-group {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .merge-area {
+            border: 2px dashed #dee2e6;
+            border-radius: 10px;
+            padding: 20px;
+            text-align: center;
+            min-height: 150px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            transition: all 0.3s ease;
+        }
+
+        .merge-area.dragover {
+            border-color: #667eea;
+            background: #f0f4ff;
+        }
+
+        .file-list {
+            list-style: none;
+            margin: 15px 0;
+        }
+
+        .file-item {
             display: flex;
             justify-content: space-between;
+            align-items: center;
+            padding: 10px;
+            background: #f8f9fa;
+            border-radius: 5px;
             margin-bottom: 5px;
         }
 
-        .loading {
+        .hidden {
             display: none;
-            text-align: center;
-            padding: 20px;
         }
 
-        .spinner {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #667eea;
-            border-radius: 50%;
-            width: 40px;
-            height: 40px;
-            animation: spin 1s linear infinite;
-            margin: 0 auto 15px;
-        }
-
-        @keyframes spin {
-            0% { transform: rotate(0deg); }
-            100% { transform: rotate(360deg); }
+        @media (max-width: 768px) {
+            .tools-grid {
+                grid-template-columns: 1fr;
+                padding: 20px;
+            }
+            
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
         }
     </style>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>📄 PDF to Text Converter</h1>
-            <p>Extract text from your PDF files instantly</p>
+            <h1>📄 PDF Toolkit</h1>
+            <p>Your all-in-one PDF management solution</p>
         </div>
-        
-        <div class="content">
-            <div class="upload-area" onclick="document.getElementById('fileInput').click()">
-                <div class="upload-icon">📁</div>
-                <div class="upload-text">Drop your PDF here or click to browse</div>
-                <div class="upload-subtext">Supports PDF files up to 50MB</div>
+
+        <div class="tools-grid">
+            <!-- PDF Merger -->
+            <div class="tool-card">
+                <div class="tool-header">
+                    <div class="tool-icon">🔗</div>
+                    <div class="tool-title">Merge PDFs</div>
+                </div>
+                <div class="tool-description">Combine multiple PDF files into a single document</div>
+                
+                <div class="merge-area" id="mergeArea">
+                    <p>Drag and drop PDF files here or click to select</p>
+                    <input type="file" id="mergeFiles" multiple accept=".pdf" class="file-input">
+                </div>
+                
+                <ul class="file-list" id="mergeFileList"></ul>
+                
+                <div class="button-group">
+                    <button class="btn btn-primary" onclick="mergePDFs()">Merge PDFs</button>
+                    <button class="btn btn-secondary" onclick="clearMergeList()">Clear All</button>
+                </div>
+                
+                <div id="mergeStatus"></div>
             </div>
-            
-            <input type="file" id="fileInput" accept=".pdf" />
-            
-            <div class="progress">
-                <div class="progress-bar"></div>
+
+            <!-- PDF Splitter -->
+            <div class="tool-card">
+                <div class="tool-header">
+                    <div class="tool-icon">✂️</div>
+                    <div class="tool-title">Split PDF</div>
+                </div>
+                <div class="tool-description">Extract specific pages or split PDF into separate files</div>
+                
+                <div class="file-upload">
+                    <input type="file" id="splitFile" accept=".pdf" class="file-input">
+                    <label for="splitFile" class="file-label">Choose PDF to split</label>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Page Range (e.g., 1-3, 5, 7-9)</label>
+                    <input type="text" id="pageRange" class="form-input" placeholder="1-3, 5, 7-9">
+                </div>
+                
+                <div class="pdf-preview" id="splitPreview"></div>
+                
+                <div class="button-group">
+                    <button class="btn btn-primary" onclick="splitPDF()">Split PDF</button>
+                    <button class="btn btn-secondary" onclick="extractAllPages()">Extract All Pages</button>
+                </div>
+                
+                <div id="splitStatus"></div>
             </div>
-            
-            <div class="status"></div>
-            
-            <div class="loading">
-                <div class="spinner"></div>
-                <p>Processing your PDF...</p>
+
+            <!-- Page Remover -->
+            <div class="tool-card">
+                <div class="tool-header">
+                    <div class="tool-icon">🗑️</div>
+                    <div class="tool-title">Remove Pages</div>
+                </div>
+                <div class="tool-description">Delete specific pages from your PDF</div>
+                
+                <div class="file-upload">
+                    <input type="file" id="removeFile" accept=".pdf" class="file-input">
+                    <label for="removeFile" class="file-label">Choose PDF file</label>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Pages to Remove (e.g., 2, 4-6, 8)</label>
+                    <input type="text" id="removePagesInput" class="form-input" placeholder="2, 4-6, 8">
+                </div>
+                
+                <div class="pdf-preview" id="removePreview"></div>
+                
+                <button class="btn btn-danger" onclick="removePages()">Remove Pages</button>
+                
+                <div id="removeStatus"></div>
             </div>
-            
-            <div class="file-info">
-                <h3>📋 File Information</h3>
-                <div class="info-row">
-                    <span>File Name:</span>
-                    <span id="fileName"></span>
+
+            <!-- Text Extractor -->
+            <div class="tool-card">
+                <div class="tool-header">
+                    <div class="tool-icon">📝</div>
+                    <div class="tool-title">Extract Text</div>
                 </div>
-                <div class="info-row">
-                    <span>File Size:</span>
-                    <span id="fileSize"></span>
+                <div class="tool-description">Extract all text content from PDF documents</div>
+                
+                <div class="file-upload">
+                    <input type="file" id="extractFile" accept=".pdf" class="file-input">
+                    <label for="extractFile" class="file-label">Choose PDF file</label>
                 </div>
-                <div class="info-row">
-                    <span>Pages:</span>
-                    <span id="pageCount"></span>
+                
+                <button class="btn btn-primary" onclick="extractText()">Extract Text</button>
+                
+                <textarea id="extractedText" class="text-output" placeholder="Extracted text will appear here..."></textarea>
+                
+                <div class="button-group">
+                    <button class="btn btn-secondary" onclick="copyText()">Copy Text</button>
+                    <button class="btn btn-success" onclick="downloadText()">Download as TXT</button>
                 </div>
-                <div class="info-row">
-                    <span>Characters:</span>
-                    <span id="charCount"></span>
-                </div>
+                
+                <div id="extractStatus"></div>
             </div>
-            
-            <div class="result-area">
-                <div class="result-header">
-                    <div class="result-title">📝 Extracted Text</div>
-                    <div>
-                        <button class="btn copy-btn" onclick="copyText()">📋 Copy</button>
-                        <button class="btn download-btn" onclick="downloadText()">💾 Download</button>
-                    </div>
+
+            <!-- Password Remover -->
+            <div class="tool-card">
+                <div class="tool-header">
+                    <div class="tool-icon">🔓</div>
+                    <div class="tool-title">Remove Password</div>
                 </div>
-                <textarea id="extractedText" placeholder="Extracted text will appear here..."></textarea>
+                <div class="tool-description">Remove password protection from PDF files</div>
+                
+                <div class="file-upload">
+                    <input type="file" id="passwordFile" accept=".pdf" class="file-input">
+                    <label for="passwordFile" class="file-label">Choose password-protected PDF</label>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Current Password</label>
+                    <input type="password" id="currentPassword" class="form-input" placeholder="Enter current password">
+                </div>
+                
+                <button class="btn btn-primary" onclick="removePassword()">Remove Password</button>
+                
+                <div id="passwordStatus"></div>
+            </div>
+
+            <!-- PDF to Images -->
+            <div class="tool-card">
+                <div class="tool-header">
+                    <div class="tool-icon">🖼️</div>
+                    <div class="tool-title">PDF to Images</div>
+                </div>
+                <div class="tool-description">Convert PDF pages to PNG/JPEG images</div>
+                
+                <div class="file-upload">
+                    <input type="file" id="imageFile" accept=".pdf" class="file-input">
+                    <label for="imageFile" class="file-label">Choose PDF file</label>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Output Format</label>
+                    <select id="imageFormat" class="form-input">
+                        <option value="png">PNG</option>
+                        <option value="jpeg">JPEG</option>
+                    </select>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Quality (1-100)</label>
+                    <input type="number" id="imageQuality" class="form-input" value="90" min="1" max="100">
+                </div>
+                
+                <button class="btn btn-primary" onclick="convertToImages()">Convert to Images</button>
+                
+                <div id="imageStatus"></div>
+                <div id="imagePreview"></div>
+            </div>
+
+            <!-- Image to PDF -->
+            <div class="tool-card">
+                <div class="tool-header">
+                    <div class="tool-icon">📷</div>
+                    <div class="tool-title">Images to PDF</div>
+                </div>
+                <div class="tool-description">Convert images to a single PDF document</div>
+                
+                <div class="file-upload">
+                    <input type="file" id="imagesToPdf" multiple accept="image/*" class="file-input">
+                    <label for="imagesToPdf" class="file-label">Choose image files</label>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Page Size</label>
+                    <select id="pageSize" class="form-input">
+                        <option value="a4">A4</option>
+                        <option value="letter">Letter</option>
+                        <option value="legal">Legal</option>
+                        <option value="a3">A3</option>
+                    </select>
+                </div>
+                
+                <ul class="file-list" id="imageFileList"></ul>
+                
+                <div class="button-group">
+                    <button class="btn btn-primary" onclick="imagesToPDF()">Create PDF</button>
+                    <button class="btn btn-secondary" onclick="clearImageList()">Clear All</button>
+                </div>
+                
+                <div id="imageToPdfStatus"></div>
+            </div>
+
+            <!-- PDF Compressor -->
+            <div class="tool-card">
+                <div class="tool-header">
+                    <div class="tool-icon">🗜️</div>
+                    <div class="tool-title">Compress PDF</div>
+                </div>
+                <div class="tool-description">Reduce PDF file size while maintaining quality</div>
+                
+                <div class="file-upload">
+                    <input type="file" id="compressFile" accept=".pdf" class="file-input">
+                    <label for="compressFile" class="file-label">Choose PDF to compress</label>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Compression Level</label>
+                    <select id="compressionLevel" class="form-input">
+                        <option value="low">Low (Best Quality)</option>
+                        <option value="medium">Medium (Balanced)</option>
+                        <option value="high">High (Smallest Size)</option>
+                    </select>
+                </div>
+                
+                <button class="btn btn-primary" onclick="compressPDF()">Compress PDF</button>
+                
+                <div id="compressStatus"></div>
+            </div>
+
+            <!-- Add Watermark -->
+            <div class="tool-card">
+                <div class="tool-header">
+                    <div class="tool-icon">💧</div>
+                    <div class="tool-title">Add Watermark</div>
+                </div>
+                <div class="tool-description">Add text watermark to PDF pages</div>
+                
+                <div class="file-upload">
+                    <input type="file" id="watermarkFile" accept=".pdf" class="file-input">
+                    <label for="watermarkFile" class="file-label">Choose PDF file</label>
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Watermark Text</label>
+                    <input type="text" id="watermarkText" class="form-input" placeholder="CONFIDENTIAL">
+                </div>
+                
+                <div class="form-group">
+                    <label class="form-label">Opacity (0-100)</label>
+                    <input type="number" id="watermarkOpacity" class="form-input" value="30" min="0" max="100">
+                </div>
+                
+                <button class="btn btn-primary" onclick="addWatermark()">Add Watermark</button>
+                
+                <div id="watermarkStatus"></div>
             </div>
         </div>
     </div>
 
     <script>
+        // Global variables
+        let mergeFileList = [];
+        let imageFileList = [];
+
+        // Initialize PDF.js worker
         pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-        
-        let extractedTextContent = '';
-        let currentFileName = '';
-        
-        const fileInput = document.getElementById('fileInput');
-        const uploadArea = document.querySelector('.upload-area');
-        const progress = document.querySelector('.progress');
-        const progressBar = document.querySelector('.progress-bar');
-        const status = document.querySelector('.status');
-        const loading = document.querySelector('.loading');
-        const fileInfo = document.querySelector('.file-info');
-        const resultArea = document.querySelector('.result-area');
-        const extractedTextEl = document.getElementById('extractedText');
-        
-        // Drag and drop functionality
-        uploadArea.addEventListener('dragover', (e) => {
-            e.preventDefault();
-            uploadArea.classList.add('dragover');
-        });
-        
-        uploadArea.addEventListener('dragleave', () => {
-            uploadArea.classList.remove('dragover');
-        });
-        
-        uploadArea.addEventListener('drop', (e) => {
-            e.preventDefault();
-            uploadArea.classList.remove('dragover');
-            const files = e.dataTransfer.files;
-            if (files.length > 0) {
-                handleFile(files[0]);
-            }
-        });
-        
-        fileInput.addEventListener('change', (e) => {
-            if (e.target.files.length > 0) {
-                handleFile(e.target.files[0]);
-            }
-        });
-        
-        function showStatus(message, type) {
-            status.textContent = message;
-            status.className = `status ${type}`;
-            status.style.display = 'block';
+
+        // Utility functions
+        function showStatus(elementId, message, type = 'info') {
+            const element = document.getElementById(elementId);
+            element.innerHTML = `<div class="status status-${type}">${message}</div>`;
             setTimeout(() => {
-                status.style.display = 'none';
+                element.innerHTML = '';
             }, 5000);
         }
-        
-        function formatFileSize(bytes) {
-            if (bytes === 0) return '0 Bytes';
-            const k = 1024;
-            const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-            const i = Math.floor(Math.log(bytes) / Math.log(k));
-            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-        }
-        
-        async function handleFile(file) {
-            if (!file || file.type !== 'application/pdf') {
-                showStatus('Please select a valid PDF file.', 'error');
-                return;
-            }
-            
-            if (file.size > 50 * 1024 * 1024) {
-                showStatus('File size too large. Please select a file smaller than 50MB.', 'error');
-                return;
-            }
-            
-            currentFileName = file.name;
-            hideElements();
-            loading.style.display = 'block';
-            progress.style.display = 'block';
-            
-            try {
-                const arrayBuffer = await file.arrayBuffer();
-                const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
-                
-                document.getElementById('fileName').textContent = file.name;
-                document.getElementById('fileSize').textContent = formatFileSize(file.size);
-                document.getElementById('pageCount').textContent = pdf.numPages;
-                
-                let fullText = '';
-                const totalPages = pdf.numPages;
-                
-                for (let i = 1; i <= totalPages; i++) {
-                    const page = await pdf.getPage(i);
-                    const textContent = await page.getTextContent();
-                    const pageText = textContent.items.map(item => item.str).join(' ');
-                    
-                    if (pageText.trim()) {
-                        fullText += `--- Page ${i} ---\n${pageText}\n\n`;
-                    }
-                    
-                    // Update progress
-                    const progressPercent = (i / totalPages) * 100;
-                    progressBar.style.width = progressPercent + '%';
-                }
-                
-                extractedTextContent = fullText;
-                extractedTextEl.value = fullText;
-                document.getElementById('charCount').textContent = fullText.length.toLocaleString();
-                
-                // Show results
-                loading.style.display = 'none';
-                progress.style.display = 'none';
-                fileInfo.style.display = 'block';
-                resultArea.style.display = 'block';
-                
-                showStatus(`Successfully extracted text from ${totalPages} page(s)!`, 'success');
-                
-            } catch (error) {
-                console.error('Error processing PDF:', error);
-                loading.style.display = 'none';
-                progress.style.display = 'none';
-                showStatus('Error processing PDF. Please try with a different file.', 'error');
-            }
-        }
-        
-        function hideElements() {
-            fileInfo.style.display = 'none';
-            resultArea.style.display = 'none';
-            progressBar.style.width = '0%';
-        }
-        
-        function copyText() {
-            extractedTextEl.select();
-            document.execCommand('copy');
-            showStatus('Text copied to clipboard!', 'success');
-        }
-        
-        function downloadText() {
-            const blob = new Blob([extractedTextContent], { type: 'text/plain' });
+
+        function downloadFile(blob, filename) {
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
-            a.download = currentFileName.replace('.pdf', '.txt');
+            a.download = filename;
             document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
-            showStatus('Text file downloaded!', 'success');
         }
+
+        // File input handlers
+        document.getElementById('mergeFiles').addEventListener('change', function(e) {
+            handleMergeFiles(e.target.files);
+        });
+
+        document.getElementById('imagesToPdf').addEventListener('change', function(e) {
+            handleImageFiles(e.target.files);
+        });
+
+        // Drag and drop handlers
+        document.getElementById('mergeArea').addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.classList.add('dragover');
+        });
+
+        document.getElementById('mergeArea').addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+        });
+
+        document.getElementById('mergeArea').addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+            handleMergeFiles(e.dataTransfer.files);
+        });
+
+        document.getElementById('mergeArea').addEventListener('click', function() {
+            document.getElementById('mergeFiles').click();
+        });
+
+        // Merge PDF functions
+        function handleMergeFiles(files) {
+            for (let file of files) {
+                if (file.type === 'application/pdf') {
+                    mergeFileList.push(file);
+                }
+            }
+            updateMergeFileList();
+        }
+
+        function updateMergeFileList() {
+            const list = document.getElementById('mergeFileList');
+            list.innerHTML = '';
+            mergeFileList.forEach((file, index) => {
+                const li = document.createElement('li');
+                li.className = 'file-item';
+                li.innerHTML = `
+                    <span>${file.name}</span>
+                    <button class="btn btn-danger" onclick="removeMergeFile(${index})">Remove</button>
+                `;
+                list.appendChild(li);
+            });
+        }
+
+        function removeMergeFile(index) {
+            mergeFileList.splice(index, 1);
+            updateMergeFileList();
+        }
+
+        function clearMergeList() {
+            mergeFileList = [];
+            updateMergeFileList();
+        }
+
+        async function mergePDFs() {
+            if (mergeFileList.length < 2) {
+                showStatus('mergeStatus', 'Please select at least 2 PDF files to merge', 'error');
+                return;
+            }
+
+            try {
+                showStatus('mergeStatus', 'Merging PDFs...', 'info');
+                const mergedPdf = await PDFLib.PDFDocument.create();
+
+                for (let file of mergeFileList) {
+                    const arrayBuffer = await file.arrayBuffer();
+                    const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
+                    const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
+                    copiedPages.forEach((page) => mergedPdf.addPage(page));
+                }
+
+                const pdfBytes = await mergedPdf.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                downloadFile(blob, 'merged-document.pdf');
+                
+                showStatus('mergeStatus', 'PDFs merged successfully!', 'success');
+            } catch (error) {
+                showStatus('mergeStatus', 'Error merging PDFs: ' + error.message, 'error');
+            }
+        }
+
+        // Split PDF functions
+        document.getElementById('splitFile').addEventListener('change', async function(e) {
+            if (e.target.files[0]) {
+                await loadPDFPreview(e.target.files[0], 'splitPreview');
+            }
+        });
+
+        async function loadPDFPreview(file, previewId) {
+            try {
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                const preview = document.getElementById(previewId);
+                preview.innerHTML = '';
+
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    
+                    const viewport = page.getViewport({ scale: 0.3 });
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    
+                    await page.render({ canvasContext: context, viewport: viewport }).promise;
+                    
+                    const thumbnail = document.createElement('div');
+                    thumbnail.className = 'page-thumbnail';
+                    thumbnail.appendChild(canvas);
+                    
+                    const pageNumber = document.createElement('div');
+                    pageNumber.className = 'page-number';
+                    pageNumber.textContent = i;
+                    thumbnail.appendChild(pageNumber);
+                    
+                    preview.appendChild(thumbnail);
+                }
+            } catch (error) {
+                console.error('Error loading PDF preview:', error);
+            }
+        }
+
+        async function splitPDF() {
+            const file = document.getElementById('splitFile').files[0];
+            const pageRange = document.getElementById('pageRange').value;
+            
+            if (!file) {
+                showStatus('splitStatus', 'Please select a PDF file', 'error');
+                return;
+            }
+
+            if (!pageRange) {
+                showStatus('splitStatus', 'Please specify page range', 'error');
+                return;
+            }
+
+            try {
+                showStatus('splitStatus', 'Splitting PDF...', 'info');
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
+                
+                const pages = parsePageRange(pageRange, pdf.getPageCount());
+                const newPdf = await PDFLib.PDFDocument.create();
+                const copiedPages = await newPdf.copyPages(pdf, pages.map(p => p - 1));
+                
+                copiedPages.forEach((page) => newPdf.addPage(page));
+                
+                const pdfBytes = await newPdf.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                downloadFile(blob, `split-pages-${pageRange.replace(/[,\s]/g, '-')}.pdf`);
+                
+                showStatus('splitStatus', 'PDF split successfully!', 'success');
+            } catch (error) {
+                showStatus('splitStatus', 'Error splitting PDF: ' + error.message, 'error');
+            }
+        }
+
+        async function extractAllPages() {
+            const file = document.getElementById('splitFile').files[0];
+            
+            if (!file) {
+                showStatus('splitStatus', 'Please select a PDF file', 'error');
+                return;
+            }
+
+            try {
+                showStatus('splitStatus', 'Extracting all pages...', 'info');
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
+                
+                for (let i = 0; i < pdf.getPageCount(); i++) {
+                    const newPdf = await PDFLib.PDFDocument.create();
+                    const [copiedPage] = await newPdf.copyPages(pdf, [i]);
+                    newPdf.addPage(copiedPage);
+                    
+                    const pdfBytes = await newPdf.save();
+                    const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                    downloadFile(blob, `page-${i + 1}.pdf`);
+                }
+                
+                showStatus('splitStatus', `All ${pdf.getPageCount()} pages extracted successfully!`, 'success');
+            } catch (error) {
+                showStatus('splitStatus', 'Error extracting pages: ' + error.message, 'error');
+            }
+        }
+
+        // Remove pages functions
+        document.getElementById('removeFile').addEventListener('change', async function(e) {
+            if (e.target.files[0]) {
+                await loadPDFPreview(e.target.files[0], 'removePreview');
+            }
+        });
+
+        async function removePages() {
+            const file = document.getElementById('removeFile').files[0];
+            const pagesToRemove = document.getElementById('removePagesInput').value;
+            
+            if (!file) {
+                showStatus('removeStatus', 'Please select a PDF file', 'error');
+                return;
+            }
+
+            if (!pagesToRemove) {
+                showStatus('removeStatus', 'Please specify pages to remove', 'error');
+                return;
+            }
+
+            try {
+                showStatus('removeStatus', 'Removing pages...', 'info');
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
+                
+                const removePageNumbers = parsePageRange(pagesToRemove, pdf.getPageCount());
+                const newPdf = await PDFLib.PDFDocument.create();
+                
+                // Get all pages except the ones to remove
+                const keepPages = [];
+                for (let i = 1; i <= pdf.getPageCount(); i++) {
+                    if (!removePageNumbers.includes(i)) {
+                        keepPages.push(i - 1); // Convert to 0-based index
+                    }
+                }
+                
+                if (keepPages.length === 0) {
+                    showStatus('removeStatus', 'Cannot remove all pages from PDF', 'error');
+                    return;
+                }
+                
+                const copiedPages = await newPdf.copyPages(pdf, keepPages);
+                copiedPages.forEach((page) => newPdf.addPage(page));
+                
+                const pdfBytes = await newPdf.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                downloadFile(blob, 'document-pages-removed.pdf');
+                
+                showStatus('removeStatus', `Pages ${pagesToRemove} removed successfully!`, 'success');
+            } catch (error) {
+                showStatus('removeStatus', 'Error removing pages: ' + error.message, 'error');
+            }
+        }
+
+        // Text extraction functions
+        async function extractText() {
+            const file = document.getElementById('extractFile').files[0];
+            
+            if (!file) {
+                showStatus('extractStatus', 'Please select a PDF file', 'error');
+                return;
+            }
+
+            try {
+                showStatus('extractStatus', 'Extracting text...', 'info');
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                
+                let fullText = '';
+                
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const textContent = await page.getTextContent();
+                    const pageText = textContent.items.map(item => item.str).join(' ');
+                    fullText += `--- Page ${i} ---\n${pageText}\n\n`;
+                }
+                
+                document.getElementById('extractedText').value = fullText;
+                showStatus('extractStatus', 'Text extracted successfully!', 'success');
+            } catch (error) {
+                showStatus('extractStatus', 'Error extracting text: ' + error.message, 'error');
+            }
+        }
+
+        function copyText() {
+            const textArea = document.getElementById('extractedText');
+            textArea.select();
+            document.execCommand('copy');
+            showStatus('extractStatus', 'Text copied to clipboard!', 'success');
+        }
+
+        function downloadText() {
+            const text = document.getElementById('extractedText').value;
+            if (!text) {
+                showStatus('extractStatus', 'No text to download', 'error');
+                return;
+            }
+            
+            const blob = new Blob([text], { type: 'text/plain' });
+            downloadFile(blob, 'extracted-text.txt');
+        }
+
+        // Password removal functions
+        async function removePassword() {
+            const file = document.getElementById('passwordFile').files[0];
+            const password = document.getElementById('currentPassword').value;
+            
+            if (!file) {
+                showStatus('passwordStatus', 'Please select a PDF file', 'error');
+                return;
+            }
+
+            if (!password) {
+                showStatus('passwordStatus', 'Please enter the current password', 'error');
+                return;
+            }
+
+            try {
+                showStatus('passwordStatus', 'Removing password...', 'info');
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await PDFLib.PDFDocument.load(arrayBuffer, { password: password });
+                
+                const pdfBytes = await pdf.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                downloadFile(blob, 'unlocked-document.pdf');
+                
+                showStatus('passwordStatus', 'Password removed successfully!', 'success');
+            } catch (error) {
+                showStatus('passwordStatus', 'Error removing password: ' + error.message, 'error');
+            }
+        }
+
+        // PDF to Images functions
+        async function convertToImages() {
+            const file = document.getElementById('imageFile').files[0];
+            const format = document.getElementById('imageFormat').value;
+            const quality = document.getElementById('imageQuality').value / 100;
+            
+            if (!file) {
+                showStatus('imageStatus', 'Please select a PDF file', 'error');
+                return;
+            }
+
+            try {
+                showStatus('imageStatus', 'Converting to images...', 'info');
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await pdfjsLib.getDocument(arrayBuffer).promise;
+                
+                const previewDiv = document.getElementById('imagePreview');
+                previewDiv.innerHTML = '';
+                
+                for (let i = 1; i <= pdf.numPages; i++) {
+                    const page = await pdf.getPage(i);
+                    const canvas = document.createElement('canvas');
+                    const context = canvas.getContext('2d');
+                    
+                    const viewport = page.getViewport({ scale: 2.0 });
+                    canvas.width = viewport.width;
+                    canvas.height = viewport.height;
+                    
+                    await page.render({ canvasContext: context, viewport: viewport }).promise;
+                    
+                    // Convert canvas to blob
+                    canvas.toBlob((blob) => {
+                        downloadFile(blob, `page-${i}.${format}`);
+                    }, `image/${format}`, quality);
+                    
+                    // Add preview
+                    const previewCanvas = document.createElement('canvas');
+                    const previewContext = previewCanvas.getContext('2d');
+                    const previewViewport = page.getViewport({ scale: 0.3 });
+                    previewCanvas.width = previewViewport.width;
+                    previewCanvas.height = previewViewport.height;
+                    
+                    await page.render({ canvasContext: previewContext, viewport: previewViewport }).promise;
+                    previewDiv.appendChild(previewCanvas);
+                }
+                
+                showStatus('imageStatus', `${pdf.numPages} images created successfully!`, 'success');
+            } catch (error) {
+                showStatus('imageStatus', 'Error converting to images: ' + error.message, 'error');
+            }
+        }
+
+        // Images to PDF functions
+        function handleImageFiles(files) {
+            for (let file of files) {
+                if (file.type.startsWith('image/')) {
+                    imageFileList.push(file);
+                }
+            }
+            updateImageFileList();
+        }
+
+        function updateImageFileList() {
+            const list = document.getElementById('imageFileList');
+            list.innerHTML = '';
+            imageFileList.forEach((file, index) => {
+                const li = document.createElement('li');
+                li.className = 'file-item';
+                li.innerHTML = `
+                    <span>${file.name}</span>
+                    <button class="btn btn-danger" onclick="removeImageFile(${index})">Remove</button>
+                `;
+                list.appendChild(li);
+            });
+        }
+
+        function removeImageFile(index) {
+            imageFileList.splice(index, 1);
+            updateImageFileList();
+        }
+
+        function clearImageList() {
+            imageFileList = [];
+            updateImageFileList();
+        }
+
+        async function imagesToPDF() {
+            if (imageFileList.length === 0) {
+                showStatus('imageToPdfStatus', 'Please select image files', 'error');
+                return;
+            }
+
+            try {
+                showStatus('imageToPdfStatus', 'Creating PDF from images...', 'info');
+                const pdf = new jsPDF.jsPDF();
+                const pageSize = document.getElementById('pageSize').value;
+                
+                // Set page size
+                let pageWidth, pageHeight;
+                switch(pageSize) {
+                    case 'a4':
+                        pageWidth = 210; pageHeight = 297;
+                        break;
+                    case 'letter':
+                        pageWidth = 216; pageHeight = 279;
+                        break;
+                    case 'legal':
+                        pageWidth = 216; pageHeight = 356;
+                        break;
+                    case 'a3':
+                        pageWidth = 297; pageHeight = 420;
+                        break;
+                }
+
+                for (let i = 0; i < imageFileList.length; i++) {
+                    const file = imageFileList[i];
+                    const img = new Image();
+                    
+                    await new Promise((resolve) => {
+                        img.onload = () => {
+                            if (i > 0) pdf.addPage();
+                            
+                            // Calculate dimensions to fit page
+                            const imgRatio = img.width / img.height;
+                            const pageRatio = pageWidth / pageHeight;
+                            
+                            let imgWidth, imgHeight;
+                            if (imgRatio > pageRatio) {
+                                imgWidth = pageWidth - 20;
+                                imgHeight = imgWidth / imgRatio;
+                            } else {
+                                imgHeight = pageHeight - 20;
+                                imgWidth = imgHeight * imgRatio;
+                            }
+                            
+                            const x = (pageWidth - imgWidth) / 2;
+                            const y = (pageHeight - imgHeight) / 2;
+                            
+                            pdf.addImage(img, 'JPEG', x, y, imgWidth, imgHeight);
+                            resolve();
+                        };
+                        img.src = URL.createObjectURL(file);
+                    });
+                }
+                
+                pdf.save('images-to-pdf.pdf');
+                showStatus('imageToPdfStatus', 'PDF created successfully!', 'success');
+            } catch (error) {
+                showStatus('imageToPdfStatus', 'Error creating PDF: ' + error.message, 'error');
+            }
+        }
+
+        // PDF Compression functions
+        async function compressPDF() {
+            const file = document.getElementById('compressFile').files[0];
+            const level = document.getElementById('compressionLevel').value;
+            
+            if (!file) {
+                showStatus('compressStatus', 'Please select a PDF file', 'error');
+                return;
+            }
+
+            try {
+                showStatus('compressStatus', 'Compressing PDF...', 'info');
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
+                
+                // Basic compression by re-saving
+                const pdfBytes = await pdf.save({
+                    useObjectStreams: level !== 'low',
+                    addDefaultPage: false,
+                    objectsGroupSize: level === 'high' ? 2 : 1
+                });
+                
+                const originalSize = file.size;
+                const compressedSize = pdfBytes.length;
+                const savings = ((originalSize - compressedSize) / originalSize * 100).toFixed(1);
+                
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                downloadFile(blob, 'compressed-document.pdf');
+                
+                showStatus('compressStatus', `PDF compressed successfully! Size reduced by ${savings}%`, 'success');
+            } catch (error) {
+                showStatus('compressStatus', 'Error compressing PDF: ' + error.message, 'error');
+            }
+        }
+
+        // Watermark functions
+        async function addWatermark() {
+            const file = document.getElementById('watermarkFile').files[0];
+            const watermarkText = document.getElementById('watermarkText').value;
+            const opacity = document.getElementById('watermarkOpacity').value / 100;
+            
+            if (!file) {
+                showStatus('watermarkStatus', 'Please select a PDF file', 'error');
+                return;
+            }
+
+            if (!watermarkText) {
+                showStatus('watermarkStatus', 'Please enter watermark text', 'error');
+                return;
+            }
+
+            try {
+                showStatus('watermarkStatus', 'Adding watermark...', 'info');
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
+                
+                const pages = pdf.getPages();
+                const font = await pdf.embedFont(PDFLib.StandardFonts.Helvetica);
+                
+                pages.forEach(page => {
+                    const { width, height } = page.getSize();
+                    
+                    page.drawText(watermarkText, {
+                        x: width / 2 - (watermarkText.length * 10),
+                        y: height / 2,
+                        size: 50,
+                        font: font,
+                        color: PDFLib.rgb(0.5, 0.5, 0.5),
+                        opacity: opacity,
+                        rotate: PDFLib.degrees(45)
+                    });
+                });
+                
+                const pdfBytes = await pdf.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                downloadFile(blob, 'watermarked-document.pdf');
+                
+                showStatus('watermarkStatus', 'Watermark added successfully!', 'success');
+            } catch (error) {
+                showStatus('watermarkStatus', 'Error adding watermark: ' + error.message, 'error');
+            }
+        }
+
+        // Utility function to parse page ranges
+        function parsePageRange(range, maxPages) {
+            const pages = [];
+            const parts = range.split(',');
+            
+            parts.forEach(part => {
+                part = part.trim();
+                if (part.includes('-')) {
+                    const [start, end] = part.split('-').map(n => parseInt(n.trim()));
+                    for (let i = start; i <= Math.min(end, maxPages); i++) {
+                        if (i > 0 && !pages.includes(i)) {
+                            pages.push(i);
+                        }
+                    }
+                } else {
+                    const pageNum = parseInt(part);
+                    if (pageNum > 0 && pageNum <= maxPages && !pages.includes(pageNum)) {
+                        pages.push(pageNum);
+                    }
+                }
+            });
+            
+            return pages.sort((a, b) => a - b);
+        }
+
+        // Initialize drag and drop for file inputs
+        document.querySelectorAll('.file-input').forEach(input => {
+            if (input.id !== 'mergeFiles' && input.id !== 'imagesToPdf') {
+                const label = input.nextElementSibling;
+                
+                label.addEventListener('dragover', function(e) {
+                    e.preventDefault();
+                    this.classList.add('dragover');
+                });
+                
+                label.addEventListener('dragleave', function(e) {
+                    e.preventDefault();
+                    this.classList.remove('dragover');
+                });
+                
+                label.addEventListener('drop', function(e) {
+                    e.preventDefault();
+                    this.classList.remove('dragover');
+                    if (e.dataTransfer.files.length > 0) {
+                        input.files = e.dataTransfer.files;
+                        input.dispatchEvent(new Event('change', { bubbles: true }));
+                    }
+                });
+            }
+        });
     </script>
 </body>
 </html>
