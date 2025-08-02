@@ -147,6 +147,12 @@
             color: #007bff;
         }
 
+        .file-selected {
+            background: #d4edda !important;
+            border-color: #28a745 !important;
+            color: #155724 !important;
+        }
+
         .btn {
             padding: 12px 24px;
             border: none;
@@ -383,7 +389,7 @@
                 
                 <div class="merge-area" id="mergeArea">
                     <p>Drag and drop PDF files here or click to select</p>
-                    <input type="file" id="mergeFiles" multiple accept=".pdf" class="file-input">
+                    <input type="file" id="mergeFiles" multiple accept=".pdf" class="file-input hidden">
                 </div>
                 
                 <ul class="file-list" id="mergeFileList"></ul>
@@ -647,55 +653,245 @@
             URL.revokeObjectURL(url);
         }
 
-        // File input handlers
-        document.getElementById('mergeFiles').addEventListener('change', function(e) {
-            handleMergeFiles(e.target.files);
+        function updateFileLabel(inputId, labelText) {
+            const input = document.getElementById(inputId);
+            const label = input.nextElementSibling;
+            label.textContent = labelText;
+            label.classList.add('file-selected');
+        }
+
+        // Fix 1: Add watermark to entire page
+        async function addWatermark() {
+            const file = document.getElementById('watermarkFile').files[0];
+            const watermarkText = document.getElementById('watermarkText').value;
+            const opacity = document.getElementById('watermarkOpacity').value / 100;
+            
+            if (!file) {
+                showStatus('watermarkStatus', 'Please select a PDF file', 'error');
+                return;
+            }
+
+            if (!watermarkText) {
+                showStatus('watermarkStatus', 'Please enter watermark text', 'error');
+                return;
+            }
+
+            try {
+                showStatus('watermarkStatus', 'Adding watermark...', 'info');
+                const arrayBuffer = await file.arrayBuffer();
+                const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
+                
+                const pages = pdf.getPages();
+                const font = await pdf.embedFont(PDFLib.StandardFonts.Helvetica);
+                
+                pages.forEach(page => {
+                    const { width, height } = page.getSize();
+                    const fontSize = Math.min(width, height) * 0.08; // Responsive font size
+                    const textWidth = font.widthOfTextAtSize(watermarkText, fontSize);
+                    const textHeight = fontSize;
+                    
+                    // Calculate spacing to cover entire page
+                    const stepX = textWidth * 1.2;
+                    const stepY = textHeight * 3;
+                    
+                    // Start from negative values to ensure complete coverage
+                    const startX = -(stepX * 2);
+                    const startY = -(stepY * 2);
+                    const endX = width + (stepX * 2);
+                    const endY = height + (stepY * 2);
+                    
+                    for (let x = startX; x < endX; x += stepX) {
+                        for (let y = startY; y < endY; y += stepY) {
+                            page.drawText(watermarkText, {
+                                x: x,
+                                y: y,
+                                size: fontSize,
+                                font: font,
+                                color: PDFLib.rgb(0.5, 0.5, 0.5),
+                                opacity: opacity,
+                                rotate: PDFLib.degrees(45)
+                            });
+                        }
+                    }
+                });
+                
+                const pdfBytes = await pdf.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                downloadFile(blob, 'watermarked-document.pdf');
+                
+                showStatus('watermarkStatus', 'Watermark added successfully!', 'success');
+            } catch (error) {
+                showStatus('watermarkStatus', 'Error adding watermark: ' + error.message, 'error');
+            }
+        }
+
+        // Fix 2: Update file labels for Compress PDF, PDF to Images, Remove Password, and Extract Text
+        document.getElementById('compressFile').addEventListener('change', function(e) {
+            if (e.target.files[0]) {
+                updateFileLabel('compressFile', `Selected: ${e.target.files[0].name}`);
+            }
         });
 
+        document.getElementById('imageFile').addEventListener('change', function(e) {
+            if (e.target.files[0]) {
+                updateFileLabel('imageFile', `Selected: ${e.target.files[0].name}`);
+            }
+        });
+
+        document.getElementById('passwordFile').addEventListener('change', function(e) {
+            if (e.target.files[0]) {
+                updateFileLabel('passwordFile', `Selected: ${e.target.files[0].name}`);
+            }
+        });
+
+        document.getElementById('extractFile').addEventListener('change', function(e) {
+            if (e.target.files[0]) {
+                updateFileLabel('extractFile', `Selected: ${e.target.files[0].name}`);
+            }
+        });
+
+        // Fix 3: Images to PDF - Fix jsPDF reference
         document.getElementById('imagesToPdf').addEventListener('change', function(e) {
             handleImageFiles(e.target.files);
         });
 
-        // Drag and drop handlers
-        document.getElementById('mergeArea').addEventListener('dragover', function(e) {
-            e.preventDefault();
-            this.classList.add('dragover');
-        });
+        async function imagesToPDF() {
+            if (imageFileList.length === 0) {
+                showStatus('imageToPdfStatus', 'Please select image files', 'error');
+                return;
+            }
 
-        document.getElementById('mergeArea').addEventListener('dragleave', function(e) {
-            e.preventDefault();
-            this.classList.remove('dragover');
-        });
+            try {
+                showStatus('imageToPdfStatus', 'Creating PDF from images...', 'info');
+                // Fix: Use window.jspdf.jsPDF instead of jsPDF.jsPDF
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF();
+                const pageSize = document.getElementById('pageSize').value;
+                
+                // Set page size
+                let pageWidth, pageHeight;
+                switch(pageSize) {
+                    case 'a4':
+                        pageWidth = 210; pageHeight = 297;
+                        break;
+                    case 'letter':
+                        pageWidth = 216; pageHeight = 279;
+                        break;
+                    case 'legal':
+                        pageWidth = 216; pageHeight = 356;
+                        break;
+                    case 'a3':
+                        pageWidth = 297; pageHeight = 420;
+                        break;
+                }
 
-        document.getElementById('mergeArea').addEventListener('drop', function(e) {
-            e.preventDefault();
-            this.classList.remove('dragover');
-            handleMergeFiles(e.dataTransfer.files);
-        });
+                for (let i = 0; i < imageFileList.length; i++) {
+                    const file = imageFileList[i];
+                    const img = new Image();
+                    
+                    await new Promise((resolve) => {
+                        img.onload = () => {
+                            if (i > 0) pdf.addPage();
+                            
+                            // Calculate dimensions to fit page
+                            const imgRatio = img.width / img.height;
+                            const pageRatio = pageWidth / pageHeight;
+                            
+                            let imgWidth, imgHeight;
+                            if (imgRatio > pageRatio) {
+                                imgWidth = pageWidth - 20;
+                                imgHeight = imgWidth / imgRatio;
+                            } else {
+                                imgHeight = pageHeight - 20;
+                                imgWidth = imgHeight * imgRatio;
+                            }
+                            
+                            const x = (pageWidth - imgWidth) / 2;
+                            const y = (pageHeight - imgHeight) / 2;
+                            
+                            pdf.addImage(img, 'JPEG', x, y, imgWidth, imgHeight);
+                            resolve();
+                        };
+                        img.src = URL.createObjectURL(file);
+                    });
+                }
+                
+                pdf.save('images-to-pdf.pdf');
+                showStatus('imageToPdfStatus', 'PDF created successfully!', 'success');
+            } catch (error) {
+                showStatus('imageToPdfStatus', 'Error creating PDF: ' + error.message, 'error');
+            }
+        }
 
-        document.getElementById('mergeArea').addEventListener('click', function() {
-            document.getElementById('mergeFiles').click();
-        });
+        // Fix 4: Remove Password - Use ignoreEncryption option
+        async function removePassword() {
+            const file = document.getElementById('passwordFile').files[0];
+            const password = document.getElementById('currentPassword').value;
+            
+            if (!file) {
+                showStatus('passwordStatus', 'Please select a PDF file', 'error');
+                return;
+            }
 
-        // Merge PDF functions
-        function handleMergeFiles(files) {
+            if (!password) {
+                showStatus('passwordStatus', 'Please enter the current password', 'error');
+                return;
+            }
+
+            try {
+                showStatus('passwordStatus', 'Removing password...', 'info');
+                const arrayBuffer = await file.arrayBuffer();
+                
+                // Try to load with password first
+                let pdf;
+                try {
+                    pdf = await PDFLib.PDFDocument.load(arrayBuffer, { password: password });
+                } catch (error) {
+                    // If password fails, try with ignoreEncryption
+                    try {
+                        pdf = await PDFLib.PDFDocument.load(arrayBuffer, { 
+                            password: password,
+                            ignoreEncryption: true 
+                        });
+                    } catch (encryptionError) {
+                        throw new Error('Invalid password or unsupported encryption method');
+                    }
+                }
+                
+                const pdfBytes = await pdf.save();
+                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
+                downloadFile(blob, 'unlocked-document.pdf');
+                
+                showStatus('passwordStatus', 'Password removed successfully!', 'success');
+            } catch (error) {
+                showStatus('passwordStatus', 'Error removing password: ' + error.message, 'error');
+            }
+        }
+
+        // --- BEGIN: Merge PDF Logic ---
+        function addMergeFiles(files) {
             for (let file of files) {
-                if (file.type === 'application/pdf') {
+                if (file.type === 'application/pdf' && !mergeFileList.some(f => f.name === file.name && f.size === file.size)) {
                     mergeFileList.push(file);
                 }
             }
-            updateMergeFileList();
+            renderMergeFileList();
+            document.getElementById('mergeFiles').value = '';
         }
 
-        function updateMergeFileList() {
+        function renderMergeFileList() {
             const list = document.getElementById('mergeFileList');
             list.innerHTML = '';
+            if (mergeFileList.length === 0) {
+                list.innerHTML = '<li class="file-item">No files selected.</li>';
+                return;
+            }
             mergeFileList.forEach((file, index) => {
                 const li = document.createElement('li');
                 li.className = 'file-item';
                 li.innerHTML = `
                     <span>${file.name}</span>
-                    <button class="btn btn-danger" onclick="removeMergeFile(${index})">Remove</button>
+                    <button class="btn btn-danger" type="button" onclick="removeMergeFile(${index})">Remove</button>
                 `;
                 list.appendChild(li);
             });
@@ -703,12 +899,12 @@
 
         function removeMergeFile(index) {
             mergeFileList.splice(index, 1);
-            updateMergeFileList();
+            renderMergeFileList();
         }
 
         function clearMergeList() {
             mergeFileList = [];
-            updateMergeFileList();
+            renderMergeFileList();
         }
 
         async function mergePDFs() {
@@ -716,32 +912,52 @@
                 showStatus('mergeStatus', 'Please select at least 2 PDF files to merge', 'error');
                 return;
             }
-
             try {
                 showStatus('mergeStatus', 'Merging PDFs...', 'info');
                 const mergedPdf = await PDFLib.PDFDocument.create();
-
                 for (let file of mergeFileList) {
                     const arrayBuffer = await file.arrayBuffer();
                     const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
                     const copiedPages = await mergedPdf.copyPages(pdf, pdf.getPageIndices());
-                    copiedPages.forEach((page) => mergedPdf.addPage(page));
+                    copiedPages.forEach(page => mergedPdf.addPage(page));
                 }
-
                 const pdfBytes = await mergedPdf.save();
                 const blob = new Blob([pdfBytes], { type: 'application/pdf' });
                 downloadFile(blob, 'merged-document.pdf');
-                
                 showStatus('mergeStatus', 'PDFs merged successfully!', 'success');
+                clearMergeList();
             } catch (error) {
                 showStatus('mergeStatus', 'Error merging PDFs: ' + error.message, 'error');
             }
         }
 
+        // Event handlers for merge functionality
+        document.getElementById('mergeFiles').addEventListener('change', function(e) {
+            addMergeFiles(e.target.files);
+        });
+        document.getElementById('mergeArea').addEventListener('dragover', function(e) {
+            e.preventDefault();
+            this.classList.add('dragover');
+        });
+        document.getElementById('mergeArea').addEventListener('dragleave', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+        });
+        document.getElementById('mergeArea').addEventListener('drop', function(e) {
+            e.preventDefault();
+            this.classList.remove('dragover');
+            addMergeFiles(e.dataTransfer.files);
+        });
+        document.getElementById('mergeArea').addEventListener('click', function() {
+            document.getElementById('mergeFiles').click();
+        });
+        // --- END: Merge PDF Logic ---
+
         // Split PDF functions
         document.getElementById('splitFile').addEventListener('change', async function(e) {
             if (e.target.files[0]) {
                 await loadPDFPreview(e.target.files[0], 'splitPreview');
+                updateFileLabel('splitFile', `Selected: ${e.target.files[0].name}`);
             }
         });
 
@@ -847,6 +1063,7 @@
         document.getElementById('removeFile').addEventListener('change', async function(e) {
             if (e.target.files[0]) {
                 await loadPDFPreview(e.target.files[0], 'removePreview');
+                updateFileLabel('removeFile', `Selected: ${e.target.files[0].name}`);
             }
         });
 
@@ -946,36 +1163,6 @@
             downloadFile(blob, 'extracted-text.txt');
         }
 
-        // Password removal functions
-        async function removePassword() {
-            const file = document.getElementById('passwordFile').files[0];
-            const password = document.getElementById('currentPassword').value;
-            
-            if (!file) {
-                showStatus('passwordStatus', 'Please select a PDF file', 'error');
-                return;
-            }
-
-            if (!password) {
-                showStatus('passwordStatus', 'Please enter the current password', 'error');
-                return;
-            }
-
-            try {
-                showStatus('passwordStatus', 'Removing password...', 'info');
-                const arrayBuffer = await file.arrayBuffer();
-                const pdf = await PDFLib.PDFDocument.load(arrayBuffer, { password: password });
-                
-                const pdfBytes = await pdf.save();
-                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-                downloadFile(blob, 'unlocked-document.pdf');
-                
-                showStatus('passwordStatus', 'Password removed successfully!', 'success');
-            } catch (error) {
-                showStatus('passwordStatus', 'Error removing password: ' + error.message, 'error');
-            }
-        }
-
         // PDF to Images functions
         async function convertToImages() {
             const file = document.getElementById('imageFile').files[0];
@@ -1062,72 +1249,6 @@
             updateImageFileList();
         }
 
-        async function imagesToPDF() {
-            if (imageFileList.length === 0) {
-                showStatus('imageToPdfStatus', 'Please select image files', 'error');
-                return;
-            }
-
-            try {
-                showStatus('imageToPdfStatus', 'Creating PDF from images...', 'info');
-                const pdf = new jsPDF.jsPDF();
-                const pageSize = document.getElementById('pageSize').value;
-                
-                // Set page size
-                let pageWidth, pageHeight;
-                switch(pageSize) {
-                    case 'a4':
-                        pageWidth = 210; pageHeight = 297;
-                        break;
-                    case 'letter':
-                        pageWidth = 216; pageHeight = 279;
-                        break;
-                    case 'legal':
-                        pageWidth = 216; pageHeight = 356;
-                        break;
-                    case 'a3':
-                        pageWidth = 297; pageHeight = 420;
-                        break;
-                }
-
-                for (let i = 0; i < imageFileList.length; i++) {
-                    const file = imageFileList[i];
-                    const img = new Image();
-                    
-                    await new Promise((resolve) => {
-                        img.onload = () => {
-                            if (i > 0) pdf.addPage();
-                            
-                            // Calculate dimensions to fit page
-                            const imgRatio = img.width / img.height;
-                            const pageRatio = pageWidth / pageHeight;
-                            
-                            let imgWidth, imgHeight;
-                            if (imgRatio > pageRatio) {
-                                imgWidth = pageWidth - 20;
-                                imgHeight = imgWidth / imgRatio;
-                            } else {
-                                imgHeight = pageHeight - 20;
-                                imgWidth = imgHeight * imgRatio;
-                            }
-                            
-                            const x = (pageWidth - imgWidth) / 2;
-                            const y = (pageHeight - imgHeight) / 2;
-                            
-                            pdf.addImage(img, 'JPEG', x, y, imgWidth, imgHeight);
-                            resolve();
-                        };
-                        img.src = URL.createObjectURL(file);
-                    });
-                }
-                
-                pdf.save('images-to-pdf.pdf');
-                showStatus('imageToPdfStatus', 'PDF created successfully!', 'success');
-            } catch (error) {
-                showStatus('imageToPdfStatus', 'Error creating PDF: ' + error.message, 'error');
-            }
-        }
-
         // PDF Compression functions
         async function compressPDF() {
             const file = document.getElementById('compressFile').files[0];
@@ -1163,53 +1284,12 @@
             }
         }
 
-        // Watermark functions
-        async function addWatermark() {
-            const file = document.getElementById('watermarkFile').files[0];
-            const watermarkText = document.getElementById('watermarkText').value;
-            const opacity = document.getElementById('watermarkOpacity').value / 100;
-            
-            if (!file) {
-                showStatus('watermarkStatus', 'Please select a PDF file', 'error');
-                return;
+        // Update watermark file selection display
+        document.getElementById('watermarkFile').addEventListener('change', function(e) {
+            if (e.target.files[0]) {
+                updateFileLabel('watermarkFile', `Selected: ${e.target.files[0].name}`);
             }
-
-            if (!watermarkText) {
-                showStatus('watermarkStatus', 'Please enter watermark text', 'error');
-                return;
-            }
-
-            try {
-                showStatus('watermarkStatus', 'Adding watermark...', 'info');
-                const arrayBuffer = await file.arrayBuffer();
-                const pdf = await PDFLib.PDFDocument.load(arrayBuffer);
-                
-                const pages = pdf.getPages();
-                const font = await pdf.embedFont(PDFLib.StandardFonts.Helvetica);
-                
-                pages.forEach(page => {
-                    const { width, height } = page.getSize();
-                    
-                    page.drawText(watermarkText, {
-                        x: width / 2 - (watermarkText.length * 10),
-                        y: height / 2,
-                        size: 50,
-                        font: font,
-                        color: PDFLib.rgb(0.5, 0.5, 0.5),
-                        opacity: opacity,
-                        rotate: PDFLib.degrees(45)
-                    });
-                });
-                
-                const pdfBytes = await pdf.save();
-                const blob = new Blob([pdfBytes], { type: 'application/pdf' });
-                downloadFile(blob, 'watermarked-document.pdf');
-                
-                showStatus('watermarkStatus', 'Watermark added successfully!', 'success');
-            } catch (error) {
-                showStatus('watermarkStatus', 'Error adding watermark: ' + error.message, 'error');
-            }
-        }
+        });
 
         // Utility function to parse page ranges
         function parsePageRange(range, maxPages) {
@@ -1261,6 +1341,10 @@
                 });
             }
         });
+
+        // Initialize the merge file list display
+        renderMergeFileList();
     </script>
 </body>
 </html>
+                
